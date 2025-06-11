@@ -1,0 +1,33 @@
+# .github/workflows/ci.yml
+
+# The name of our workflow. This will show up in the "Actions" tab on GitHub.
+name: CI Workflow
+
+# This section defines when the workflow should run.
+on:
+  # We'll run this workflow on every push to the 'main' branch.
+  push:
+    branches: [ "main" ]
+
+# This section defines the jobs to be run.
+jobs:
+  # We'll define a single job called 'build'.
+  build:
+    # This job will run on a fresh virtual machine provided by GitHub.
+    # 'ubuntu-latest' is a standard, reliable choice.
+    runs-on: ubuntu-latest
+
+    # These are the steps the job will execute in order.
+    steps:
+      # Step 1: Check out your repository's code
+      # This uses a pre-made action from the community to download your code
+      # into the virtual machine.
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      # Step 2: Build the Docker image
+      # This step runs a command-line command, just like on your own terminal.
+      # It will use the Dockerfile in your repository to build an image.
+      # If the build fails, the entire workflow will fail.
+      - name: Build Docker image
+        run: docker build -t my-fastapi-app .

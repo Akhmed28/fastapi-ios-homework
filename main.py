@@ -1,65 +1,50 @@
 # main.py
+from fastapi import FastAPI, Depends, HTTPException
+from sqlalchemy.orm import Session
+from typing import List
 
-from fastapi import FastAPI, HTTPException, status
-from pydantic import BaseModel
-from typing import List, Optional
+# Import all the components we just created in the other files
+import models
+import schemas
+from database import SessionLocal, engine
 
-class Task(BaseModel):
-    id: int
-    title: str
-    description: str
-
-class TaskCreate(BaseModel):
-    
-    title: str
-    description: str
-
-fake_db = [
-    Task(id=1, title="Learn FastAPI", description="Study the official documentation."),
-    Task(id=2, title="Build a CRUD API", description="Complete the basic level of the homework.")
-]
+# This line creates the "tasks" table in the database based on our models.py definition
+# It will only do this if the table doesn't already exist.
+models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
+# --- Dependency ---
+# This function gets a database session for each request and closes it afterwards.
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
+# --- CRUD Endpoints ---
 
-@app.post("/tasks", response_model=Task, status_code=status.HTTP_201_CREATED)
-def create_task(task_to_create: TaskCreate):
-    new_id = max(t.id for t in fake_db) + 1 if fake_db else 1
-    new_task = Task(id=new_id, title=task_to_create.title, description=task_to_create.description)
-    fake_db.append(new_task)
-    return new_task
+# CREATE a task
+@app.post("/tasks", response_model=schemas.Task)
+def create_task(task: schemas.TaskCreate, db: Session = Depends(get_db)):
+    # Convert Pydantic schema to a SQLAlchemy model instance
+    db_task = models.TaskItem(title=task.title, description=task.description)
+    db.add(db_task)  # Add the new task to the database session
+    db.commit()     # Commit the transaction to save it to the database
+    db.refresh(db_task) # Refresh the instance to get the new ID from the DB
+    return db_task
 
-@app.get("/tasks", response_model=List[Task])
-def get_all_tasks():
-    return fake_db
+# READ all tasks
+@app.get("/tasks", response_model=List[schemas.Task])
+def read_tasks(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    tasks = db.query(models.TaskItem).offset(skip).limit(limit).all()
+    return tasks
 
-@app.get("/tasks/{task_id}", response_model=Task)
-def get_task_by_id(task_id: int):
-    for task in fake_db:
-        if task.id == task_id:
-            return task
-    raise HTTPException(status_code=404, detail="Task not found")
-
-@app.put("/tasks/{task_id}", response_model=Task)
-def update_task(task_id: int, task_updates: TaskCreate):
-    for index, task in enumerate(fake_db):
-        if task.id == task_id:
-            updated_task = task.copy(update=task_updates.dict())
-            fake_db[index] = updated_task
-            return updated_task
-    raise HTTPException(status_code=404, detail="Task not found")
-
-@app.delete("/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_task(task_id: int):
-    task_to_delete = None
-    for task in fake_db:
-        if task.id == task_id:
-            task_to_delete = task
-            break
-            
-    if not task_to_delete:
+# READ a single task
+@app.get("/tasks/{task_id}", response_model=schemas.Task)
+def read_task(task_id: int, db: Session = Depends(get_db)):
+    db_task = db.query(models.TaskItem).filter(models.TaskItem.id == task_id).first()
+    if db_task is None:
         raise HTTPException(status_code=404, detail="Task not found")
-        
-    fake_db.remove(task_to_delete)
-    return None
+    return db_task
