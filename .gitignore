@@ -1,0 +1,16 @@
+# Python virtual environment
+venv/
+.venv/
+
+# Python cache files
+__pycache__/
+*.pyc
+
+# macOS specific files
+.DS_Store
+
+# Xcode specific files
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+DerivedData/
