@@ -1,0 +1,36 @@
+# docker-compose.yml (Full Version with Healthcheck)
+
+version: '3.8'
+
+services:
+  db:
+    image: postgres:latest
+    environment:
+      - POSTGRES_PASSWORD=mysecretpassword
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    # This new section tells Docker how to check if Postgres is healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    ports:
+      - "8000:80"
+    volumes:
+      - .:/app
+    environment:
+      - DATABASE_URL=postgresql://postgres:mysecretpassword@db:5432/postgres
+      - SECRET_KEY=09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7
+    # This now waits for the 'db' service to be "healthy", not just "started"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
